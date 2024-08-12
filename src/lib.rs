@@ -5,7 +5,7 @@ use std::os::raw::c_char;
 
 use num_derive::FromPrimitive;
 
-#[derive(Debug, FromPrimitive)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
 pub enum SpaceType {
     Constant = 0,
     Processor = 1,
@@ -22,7 +22,7 @@ impl SpaceType {
     }
 }
 
-#[derive(Debug, FromPrimitive)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
 pub enum Opcode {
     Copy = 1,
     ///< Copy one operand to another
@@ -220,7 +220,7 @@ pub trait PCodeEmit {
         address: &ffi::Address,
         opcode: Opcode,
         outvar: Option<&ffi::VarnodeData>,
-        vars: &[ffi::VarnodeData],
+        vars: &[&ffi::VarnodeData],
     );
 }
 
@@ -262,7 +262,7 @@ impl<'a> RustPCodeEmit<'a> {
         address: &ffi::Address,
         opcode: u32,
         outvar: *const ffi::VarnodeData,
-        vars: *const ffi::VarnodeData,
+        vars: *const *const ffi::VarnodeData,
         size: i32,
     ) {
         let outvar = if outvar.is_null() {
@@ -272,7 +272,7 @@ impl<'a> RustPCodeEmit<'a> {
         };
         let vars = std::slice::from_raw_parts(vars, size as usize);
         let opcode = num::FromPrimitive::from_u32(opcode).unwrap();
-        self.internal.dump(address, opcode, outvar, vars);
+        self.internal.dump(address, opcode, outvar, std::mem::transmute(vars));
     }
 }
 
@@ -288,7 +288,7 @@ pub mod ffi {
             address: &Address,
             opcode: u32,
             outvar: *const VarnodeData,
-            vars: *const VarnodeData,
+            vars: *const *const VarnodeData,
             size: i32,
         );
 
@@ -357,6 +357,7 @@ pub mod ffi {
         fn getSpacebaseFull(self: &AddrSpace, i: i32) -> &VarnodeData;
         fn stackGrowsNegative(self: &AddrSpace) -> bool;
         fn getContain(self: &AddrSpace) -> *mut AddrSpace;
+        fn getTrans(self: &AddrSpace) -> *const Translate;
 
         type OpCode;
 
@@ -384,6 +385,12 @@ pub mod ffi {
             loadImage: *mut RustLoadImage,
             spec: UniquePtr<DocumentStorage>,
         ) -> UniquePtr<Decompiler>;
+        unsafe fn getAddressSpace(self: &Decompiler, space: i32) -> *mut AddrSpace;
+        unsafe fn getAddressSpaceByName(self: &Decompiler, space: &CxxString) -> *mut AddrSpace;
+        unsafe fn getRegisterByName<'a>(self: &'a Decompiler, reg: &CxxString) -> &'a VarnodeData;
+
+        type Translate;
+        unsafe fn owningGetRegisterName(trans: *const Translate, base: *mut AddrSpace, off: u64 , size: i32) -> UniquePtr<CxxString>;
 
     }
 }

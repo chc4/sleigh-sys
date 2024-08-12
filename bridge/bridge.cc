@@ -1,3 +1,4 @@
+#include <iostream>
 #include "bridge.hh"
 //#include "../target/cxxbridge/sleigh-sys/src/lib.rs.h"
 #include "sleigh-sys/src/lib.rs.h"
@@ -47,7 +48,17 @@ void RustLoadImageProxy::adjustVma(long adjust) {
 void RustPCodeEmitProxy::dump(const Address &addr, OpCode opc,
                               VarnodeData *outvar, VarnodeData *vars,
                               int4 isize) {
-  inner->dump(addr, (uint32_t)opc, outvar, vars, isize);
+    // Rust has a ZST VarnodeData, so doesn't know how to iterate over the array.
+    // We hand it an array of pointers instead so that it doesn't need to.
+    if(isize > 0) {
+        VarnodeData *varptrs[isize];
+        for(int i = 0; i < isize; i++) {
+            varptrs[i] = (vars + i);
+        }
+        inner->dump(addr, (uint32_t)opc, outvar, varptrs, isize);
+    } else {
+        inner->dump(addr, (uint32_t)opc, outvar, nullptr, isize);
+    }
 }
 
 int32_t Decompiler::translate(RustPCodeEmit *emit, uint64_t addr) const {
@@ -79,4 +90,8 @@ uint32_t getVarnodeSize(const VarnodeData &data) { return data.size; }
 void RustAssemblyEmitProxy::dump(const Address &addr, const string &mnem,
                                  const string &body) {
   this->inner->dump(addr, mnem, body);
+}
+
+unique_ptr<string> owningGetRegisterName(const Translate* trans, AddrSpace *base,uintb off,int4 size) {
+    return make_unique<string>(trans->getRegisterName(base,off,size));
 }

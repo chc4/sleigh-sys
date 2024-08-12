@@ -93,8 +93,11 @@ fn main() {
         .files(SOURCE_FILES.iter().map(|s| Path::new("decompiler").join(s)))
         .file("bridge/bridge.cc")
         .includes(["decompiler", "bridge"])
-        .flag("-lbfd -lz")
+        .flag("-lbfd -lz --xyz")
         .warnings(false)
         .flag_if_supported("-std=c++14")
         .compile("sleigh");
+    println!("cargo:rerun-if-changed=src/lib.rs");
+    println!("cargo:rerun-if-changed=bridge/bridge.cc");
+    println!("cargo:rerun-if-changed=bridge/bridge.hh");
 }
